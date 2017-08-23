@@ -114,7 +114,10 @@ class FOG(object):
         host_id = int(host_data['id'])
         self.set_image(host_id)
         self.schedule_deploy_task(host_id)
-        self.remote.console.power_cycle(timeout=600)
+        #self.remote.console.power_cycle(timeout=600)
+        self.remote.console.power_off()
+        self.remote.console.power_on()
+        self.remote.console._wait_for_login()
         self._wait_for_ready()
         #return self._create()
 
