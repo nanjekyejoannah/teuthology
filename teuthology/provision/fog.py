@@ -1,11 +1,6 @@
-import json
 import logging
-import os
 import requests
 import socket
-import subprocess
-import tempfile
-import yaml
 
 from datetime import datetime
 from paramiko import AuthenticationException
@@ -116,7 +111,7 @@ class FOG(object):
             time_delta = (
                 datetime.utcnow() - datetime.strptime(
                     timestamp, self.timestamp_format)
-            )
+            ).total_seconds()
             # FIXME yay magic
             if time_delta < 5:
                 return task['id']
@@ -126,14 +121,14 @@ class FOG(object):
         host_id = int(host_data['id'])
         self.set_image(host_id)
         task_id = self.schedule_deploy_task(host_id)
-        #self.remote.console.power_cycle(timeout=600)
+        # self.remote.console.power_cycle(timeout=600)
         self.remote.console.power_off()
         self.remote.console.power_on()
         self.wait_for_deploy_task(task_id)
         # console won't work bc the hostname is wrong
         # self.remote.console._wait_for_login(timeout=600)
         self._wait_for_ready()
-        #return self._create()
+        # return self._create()
 
     def _create(self):
         pass
@@ -170,10 +165,9 @@ class FOG(object):
                     MaxWhileTries,
                 ):
                     pass
-        #cmd = "while [ ! -e '%s' ]; do sleep 5; done" % self._sentinel_path
-        #self.remote.run(args=cmd, timeout=600)
-        #log.info("Node is ready: %s", self.node)
-
+        # cmd = "while [ ! -e '%s' ]; do sleep 5; done" % self._sentinel_path
+        # self.remote.run(args=cmd, timeout=600)
+        # log.info("Node is ready: %s", self.node)
 
     def destroy(self):
         pass
