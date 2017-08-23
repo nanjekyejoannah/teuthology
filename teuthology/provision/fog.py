@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 
 
 class FOG(object):
-    timestamp_format = '%Y-%m-%d_%H:%M:%S'
+    timestamp_format = '%Y-%m-%d %H:%M:%S'
 
     def __init__(self, name, os_type, os_version, status=None, user='ubuntu'):
         self.endpoint = config.fog_endpoint
