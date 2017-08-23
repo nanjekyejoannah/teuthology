@@ -69,8 +69,8 @@ class FOG(object):
         return obj['hosts'][0]
 
     def get_image_data(self):
-        name = '_'.join(
-            self.machine_type, self.os_type.lower(), self.os_version)
+        name = '_'.join([
+            self.machine_type, self.os_type.lower(), self.os_version])
         resp = self.do_request(
             '/image/search/%s' % name,
         )
