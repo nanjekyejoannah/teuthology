@@ -117,7 +117,7 @@ class FOG(object):
         #self.remote.console.power_cycle(timeout=600)
         self.remote.console.power_off()
         self.remote.console.power_on()
-        self.remote.console._wait_for_login()
+        self.remote.console._wait_for_login(timeout=600)
         self._wait_for_ready()
         #return self._create()
 
