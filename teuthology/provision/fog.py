@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import yaml
 
+from datetime import datetime
 from paramiko import AuthenticationException
 from paramiko.ssh_exception import NoValidConnectionsError
 
@@ -21,6 +22,8 @@ log = logging.getLogger(__name__)
 
 
 class FOG(object):
+    timestamp_format = '%Y-%m-%d_%H:%M:%S'
+
     def __init__(self, name, os_type, os_version, status=None, user='ubuntu'):
         self.endpoint = config.fog_endpoint
         self.api_token = config.fog_api_token
@@ -107,23 +110,52 @@ class FOG(object):
             method='POST',
             data='{"taskTypeID": %i}' % deploy_id,
         )
-        print resp.json()
-        return resp.ok
+        host_tasks = self.get_deploy_tasks()
+        for task in host_tasks:
+            timestamp = task['createdTime']
+            time_delta = (
+                datetime.utcnow() - datetime.strptime(
+                    timestamp, self.timestamp_format)
+            )
+            # FIXME yay magic
+            if time_delta < 5:
+                return task['id']
 
     def create(self):
         host_data = self.get_host_data()
         host_id = int(host_data['id'])
         self.set_image(host_id)
-        self.schedule_deploy_task(host_id)
+        task_id = self.schedule_deploy_task(host_id)
         #self.remote.console.power_cycle(timeout=600)
         self.remote.console.power_off()
         self.remote.console.power_on()
-        self.remote.console._wait_for_login(timeout=600)
+        self.wait_for_deploy_task(task_id)
+        # console won't work bc the hostname is wrong
+        # self.remote.console._wait_for_login(timeout=600)
         self._wait_for_ready()
         #return self._create()
 
     def _create(self):
         pass
+
+    def get_deploy_tasks(self):
+        resp = self.do_request('/task/active')
+        tasks = resp.json()['tasks']
+        host_tasks = [obj for obj in tasks
+                      if obj['host']['name'] == self.shortname]
+        return host_tasks
+
+    def deploy_task_active(self, task_id):
+        host_tasks = self.get_deploy_tasks()
+        return any(
+            [task['id'] == task_id for task in host_tasks]
+        )
+
+    def wait_for_deploy_task(self, task_id):
+        with safe_while(sleep=15, tries=40) as proceed:
+            while proceed():
+                if not self.deploy_task_active(task_id):
+                    break
 
     def _wait_for_ready(self):
         with safe_while(sleep=6, tries=20) as proceed:
