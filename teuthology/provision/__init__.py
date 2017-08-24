@@ -22,7 +22,7 @@ def _logfile(ctx, shortname):
 def reimage(ctx, machine_name):
     os_type = get_distro(ctx)
     os_version = get_distro_version(ctx)
-    fog_obj = fog.Fog(machine_name, os_type, os_version)
+    fog_obj = fog.FOG(machine_name, os_type, os_version)
     return fog_obj.create()
 
 
