@@ -5,6 +5,7 @@ import socket
 from datetime import datetime
 from paramiko import AuthenticationException
 from paramiko.ssh_exception import NoValidConnectionsError
+from StringIO import StringIO
 
 from ..config import config
 from ..contextutil import safe_while
@@ -50,6 +51,7 @@ class FOG(object):
         self.remote.console.power_on()
         self.wait_for_deploy_task(task_id)
         self._wait_for_ready()
+        self.fix_hostname()
         log.info("Deploy of %s is complete!", self.shortname)
 
     def do_request(self, url_suffix, data=None, method='GET', verify=True):
@@ -211,6 +213,23 @@ class FOG(object):
         # cmd = "while [ ! -e '%s' ]; do sleep 5; done" % self._sentinel_path
         # self.remote.run(args=cmd, timeout=600)
         # log.info("Node is ready: %s", self.node)
+
+    def fix_hostname(self):
+        proc = self.remote.run(args='hostname', stdout=StringIO())
+        wrong_hostname = proc.stdout.read().strip()
+        proc = self.remote.run(
+            args='grep %s /etc/hosts' % wrong_hostname,
+            stdout=StringIO())
+        wrong_ip = proc.stdout.readlines()[0].split(' ')[0]
+        self.remote.run(args="sudo hostname %s" % self.shortname)
+        self.remote.run(
+            args="sudo sed -i -e 's/%s/%s/g /etc/hosts" % (
+                wrong_hostname, self.shortname),
+        )
+        self.remote.run(
+            args="sudo sed -i -e 's/%s/%s/g /etc/hosts" % (
+                wrong_ip, self.remote.ip_address),
+        )
 
     def destroy(self):
         """A no-op; we just leave idle nodes as-is"""
