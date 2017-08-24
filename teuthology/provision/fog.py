@@ -223,11 +223,11 @@ class FOG(object):
         wrong_ip = proc.stdout.readlines()[0].split(' ')[0]
         self.remote.run(args="sudo hostname %s" % self.shortname)
         self.remote.run(
-            args="sudo sed -i -e 's/%s/%s/g /etc/hosts" % (
+            args="sudo sed -i -e 's/%s/%s/g' /etc/hosts" % (
                 wrong_hostname, self.shortname),
         )
         self.remote.run(
-            args="sudo sed -i -e 's/%s/%s/g /etc/hosts" % (
+            args="sudo sed -i -e 's/%s/%s/g' /etc/hosts" % (
                 wrong_ip, self.remote.ip_address),
         )
 
