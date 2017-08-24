@@ -195,6 +195,7 @@ class FOG(object):
         Wait until the specified task is no longer active (i.e., it has
         completed)
         """
+        log.info("Waiting for deploy to finish for %s", self.shortname)
         with safe_while(sleep=15, tries=40) as proceed:
             while proceed():
                 if not self.deploy_task_active(task_id):
