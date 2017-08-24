@@ -50,6 +50,7 @@ class FOG(object):
         self.remote.console.power_on()
         self.wait_for_deploy_task(task_id)
         self._wait_for_ready()
+        log.info("Deploy of %s is complete!", self.shortname)
 
     def do_request(self, url_suffix, data=None, method='GET', verify=True):
         """
@@ -138,6 +139,8 @@ class FOG(object):
         :param host_id: The id of the host to deploy
         :returns: The id of the scheduled task
         """
+        log.info("Scheduling deploy of %s %s on %s",
+                 self.os_type, self.os_version, self.shortname)
         # First, we need to find the right tasktype ID
         resp = self.do_request(
             '/tasktype/search/deploy',
