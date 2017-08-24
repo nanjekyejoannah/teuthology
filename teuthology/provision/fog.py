@@ -40,6 +40,9 @@ class FOG(object):
         """
         Initiate deployment and wait until completion
         """
+        # FIXME better error message
+        if not self.enabled:
+            raise RuntimeError("FOG is not configured!")
         host_data = self.get_host_data()
         host_id = int(host_data['id'])
         self.set_image(host_id)
