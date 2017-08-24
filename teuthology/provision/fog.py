@@ -11,7 +11,6 @@ from ..config import config
 from ..contextutil import safe_while
 from ..misc import decanonicalize_hostname
 from teuthology.exceptions import MaxWhileTries
-from teuthology.lock import query
 from teuthology.orchestra import remote
 
 log = logging.getLogger(__name__)
@@ -23,16 +22,17 @@ class FOG(object):
     """
     timestamp_format = '%Y-%m-%d %H:%M:%S'
 
-    def __init__(self, name, os_type, os_version, status=None, user='ubuntu'):
+    def __init__(self, name, os_type, os_version, user='ubuntu'):
         self.endpoint = config.fog_endpoint
         self.api_token = config.fog_api_token
         self.user_token = config.fog_user_token
+        self.enabled = all([
+            self.endpoint, self.api_token, self.user_token,
+        ])
         self.name = name
         self.shortname = decanonicalize_hostname(self.name)
         self.os_type = os_type
         self.os_version = os_version
-        self.status = status or query.get_status(self.name)
-        self.machine_type = self.status['machine_type']
         self.user = user
         self.remote = remote.Remote('%s@%s' % (self.user, self.name))
 
@@ -51,7 +51,7 @@ class FOG(object):
         self.remote.console.power_on()
         self.wait_for_deploy_task(task_id)
         self._wait_for_ready()
-        self.fix_hostname()
+        self._fix_hostname()
         log.info("Deploy of %s is complete!", self.shortname)
 
     def do_request(self, url_suffix, data=None, method='GET', verify=True):
@@ -110,7 +110,7 @@ class FOG(object):
         :returns: A dict describing the image
         """
         name = '_'.join([
-            self.machine_type, self.os_type.lower(), self.os_version])
+            self.remote.machine_type, self.os_type.lower(), self.os_version])
         resp = self.do_request(
             '/image/search/%s' % name,
         )
@@ -214,7 +214,12 @@ class FOG(object):
         # self.remote.run(args=cmd, timeout=600)
         # log.info("Node is ready: %s", self.node)
 
-    def fix_hostname(self):
+    def _fix_hostname(self):
+        """
+        After a reimage, the host will still have the hostname of the machine
+        used to create the image initially. Fix that by making a call to
+        /binhostname and tweaking /etc/hosts.
+        """
         proc = self.remote.run(args='hostname', stdout=StringIO())
         wrong_hostname = proc.stdout.read().strip()
         proc = self.remote.run(
