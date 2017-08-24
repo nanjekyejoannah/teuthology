@@ -106,6 +106,13 @@ def lock_many(ctx, num, machine_type, user=None, description=None,
                         unlock_one(ctx, machine, user)
                     ok_machs = keys.do_update_keys(ok_machs.keys())[1]
                 return ok_machs
+            else:
+                reimaged = dict()
+                for machine in machines:
+                    teuthology.provision.reimage(ctx, machine)
+                    reimaged[machine] = machines[machine]
+                reimaged = keys.do_update_keys(reimaged.keys())[1]
+                return reimaged
             return machines
         elif response.status_code == 503:
             log.error('Insufficient nodes available to lock %d %s nodes.',
