@@ -17,6 +17,9 @@ log = logging.getLogger(__name__)
 
 
 class FOG(object):
+    """
+    Reimage bare-metal machines with https://fogproject.org/
+    """
     timestamp_format = '%Y-%m-%d %H:%M:%S'
 
     def __init__(self, name, os_type, os_version, status=None, user='ubuntu'):
@@ -32,7 +35,33 @@ class FOG(object):
         self.user = user
         self.remote = remote.Remote('%s@%s' % (self.user, self.name))
 
+    def create(self):
+        """
+        Initiate deployment and wait until completion
+        """
+        host_data = self.get_host_data()
+        host_id = int(host_data['id'])
+        self.set_image(host_id)
+        task_id = self.schedule_deploy_task(host_id)
+        # Use power_off/power_on because other methods call _wait_for_login,
+        # which will not work here since the newly-imaged host will have an
+        # incorrect hostname
+        self.remote.console.power_off()
+        self.remote.console.power_on()
+        self.wait_for_deploy_task(task_id)
+        self._wait_for_ready()
+
     def do_request(self, url_suffix, data=None, method='GET', verify=True):
+        """
+        A convenience method to submit a request to the FOG server
+        :param url_suffix: The portion of the URL to append to the endpoint,
+                           e.g.  '/system/info'
+        :param data: Optional JSON data to submit with the request
+        :param method: The HTTP method to use for the request (default: 'GET')
+        :param verify: Whether or not to raise an exception if the request is
+                       unsuccessful (default: True)
+        :returns: A requests.models.Response object
+        """
         req_kwargs = dict(
             headers={
                 'fog-api-token': self.api_token,
@@ -55,6 +84,11 @@ class FOG(object):
         return resp
 
     def get_host_data(self):
+        """
+        Locate the host we want to use, and return the FOG object which
+        represents it
+        :returns: A dict describing the host
+        """
         resp = self.do_request(
             '/host/search/%s' % self.shortname,
         )
@@ -67,6 +101,11 @@ class FOG(object):
         return obj['hosts'][0]
 
     def get_image_data(self):
+        """
+        Locate the image we want to use, and return the FOG object which
+        represents it
+        :returns: A dict describing the image
+        """
         name = '_'.join([
             self.machine_type, self.os_type.lower(), self.os_version])
         resp = self.do_request(
@@ -82,16 +121,23 @@ class FOG(object):
         return obj['images'][0]
 
     def set_image(self, host_id):
+        """
+        Tell FOG to use the proper image on the next deploy
+        :param host_id: The id of the host to deploy
+        """
         image_data = self.get_image_data()
         image_id = int(image_data['id'])
-        resp = self.do_request(
+        self.do_request(
             '/image/%s/edit' % image_id,
             method='PUT',
             data='{"hosts": %i}' % host_id,
         )
-        return resp.ok
 
     def schedule_deploy_task(self, host_id):
+        """
+        :param host_id: The id of the host to deploy
+        :returns: The id of the scheduled task
+        """
         # First, we need to find the right tasktype ID
         resp = self.do_request(
             '/tasktype/search/deploy',
@@ -116,24 +162,10 @@ class FOG(object):
             if time_delta < 5:
                 return task['id']
 
-    def create(self):
-        host_data = self.get_host_data()
-        host_id = int(host_data['id'])
-        self.set_image(host_id)
-        task_id = self.schedule_deploy_task(host_id)
-        # self.remote.console.power_cycle(timeout=600)
-        self.remote.console.power_off()
-        self.remote.console.power_on()
-        self.wait_for_deploy_task(task_id)
-        # console won't work bc the hostname is wrong
-        # self.remote.console._wait_for_login(timeout=600)
-        self._wait_for_ready()
-        # return self._create()
-
-    def _create(self):
-        pass
-
     def get_deploy_tasks(self):
+        """
+        :returns: A list of active deploy tasks which are active on our host
+        """
         resp = self.do_request('/task/active')
         tasks = resp.json()['tasks']
         host_tasks = [obj for obj in tasks
@@ -141,12 +173,20 @@ class FOG(object):
         return host_tasks
 
     def deploy_task_active(self, task_id):
+        """
+        :param task_id: The id of the task to query
+        :returns: True if the task is active
+        """
         host_tasks = self.get_deploy_tasks()
         return any(
             [task['id'] == task_id for task in host_tasks]
         )
 
     def wait_for_deploy_task(self, task_id):
+        """
+        Wait until the specified task is no longer active (i.e., it has
+        completed)
+        """
         with safe_while(sleep=15, tries=40) as proceed:
             while proceed():
                 if not self.deploy_task_active(task_id):
@@ -170,13 +210,5 @@ class FOG(object):
         # log.info("Node is ready: %s", self.node)
 
     def destroy(self):
+        """A no-op; we just leave idle nodes as-is"""
         pass
-
-    def build_config(self):
-        pass
-
-    def remove_config(self):
-        pass
-
-    def __del__(self):
-        self.remove_config()
